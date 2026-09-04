@@ -1,5 +1,6 @@
 const userRepository = require('../repositories/user.repository');
 const { ROLES } = require('../constants');
+const { UserNotFoundError, EmailAlreadyInUseError, InvalidRoleError } = require('../errors');
 
 class UserService {
   async listUsers() {
@@ -9,9 +10,7 @@ class UserService {
   async getUser(id) {
     const user = await userRepository.getById(id);
     if (!user) {
-      const error = new Error('Usuario no encontrado');
-      error.statusCode = 404;
-      throw error;
+      throw new UserNotFoundError({ id });
     }
     return user;
   }
@@ -19,9 +18,7 @@ class UserService {
   async createUser(data) {
     const existing = await userRepository.getByEmail(data.email);
     if (existing) {
-      const error = new Error('Ya existe un usuario con ese email');
-      error.statusCode = 409;
-      throw error;
+      throw new EmailAlreadyInUseError({ email: data.email });
     }
 
     // Validación de permisos / valores de dominio: acá, no en el Repository.
@@ -31,18 +28,14 @@ class UserService {
   }
 
   async updateUser(id, updates) {
-    // No permitimos que cualquiera se autoasigne ADMIN desde este endpoint.
+    // No permitimos que cualquiera se autoasigne un rol inexistente.
     if (updates.role && !Object.values(ROLES).includes(updates.role)) {
-      const error = new Error('Rol inválido');
-      error.statusCode = 400;
-      throw error;
+      throw new InvalidRoleError({ role: updates.role });
     }
 
     const user = await userRepository.update(id, updates);
     if (!user) {
-      const error = new Error('Usuario no encontrado');
-      error.statusCode = 404;
-      throw error;
+      throw new UserNotFoundError({ id });
     }
     return user;
   }
@@ -50,9 +43,7 @@ class UserService {
   async deleteUser(id) {
     const deleted = await userRepository.delete(id);
     if (!deleted) {
-      const error = new Error('Usuario no encontrado');
-      error.statusCode = 404;
-      throw error;
+      throw new UserNotFoundError({ id });
     }
     return deleted;
   }

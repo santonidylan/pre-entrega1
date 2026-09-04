@@ -1,4 +1,4 @@
-# ShipNow API — Módulo 1 y 2: Estructura profesional + Mocking
+# ShipNow API — Módulos 1, 2 y 3: Estructura profesional + Mocking + Manejo de errores
 
 API de ShipNow refactorizada desde un modelo monolítico hacia una
 arquitectura por capas (**Controller → Service → Repository**), con
@@ -13,6 +13,14 @@ src/
 │   └── env.config.js         # única fuente de verdad para process.env, validado
 ├── constants/
 │   └── index.js               # roles, estados, prioridades y colecciones mockeables
+├── errors/
+│   ├── error-catalog.js        # diccionario: código -> statusCode + mensaje
+│   ├── AppError.js             # clase base de error de dominio
+│   ├── domain-errors.js        # errores personalizados (UserNotFoundError, etc.)
+│   └── index.js                # re-exporta todo lo de errors/
+├── middlewares/
+│   ├── error-handler.middleware.js  # ÚNICO lugar que arma la respuesta de error
+│   └── not-found.middleware.js      # 404 uniforme para rutas no definidas
 ├── models/
 │   ├── product.model.js       # solo esquema Mongoose
 │   ├── user.model.js          # solo esquema Mongoose (ADMIN, USER, REPARTIDOR)
@@ -202,6 +210,106 @@ curl -X POST "http://localhost:3000/api/mocks/seed/entregas?qty=5"
 - `qty` no numérico, cero, negativo o mayor a 100 → `400` con un
   mensaje descriptivo.
 
+## Manejo centralizado de errores
+
+Ninguna ruta ni controller responde un error por su cuenta: los
+**services** detectan el problema y lanzan (`throw`) un error, los
+**controllers** solo lo propagan con `next(err)`, y un único
+**middleware global** (`src/middlewares/error-handler.middleware.js`)
+decide qué status code y qué cuerpo devolver.
+
+### Estructura de respuesta
+
+Todos los errores de la API responden con la misma forma:
+
+```json
+{
+  "error": {
+    "code": "USER_NOT_FOUND",
+    "message": "El usuario solicitado no existe.",
+    "details": { "id": "64f1c2b3e4b0a1a2b3c4d5e6" }
+  }
+}
+```
+
+- `code`: identificador estable del error (para que el frontend pueda
+  reaccionar programáticamente, no solo mostrar el texto).
+- `message`: mensaje legible para mostrar al usuario.
+- `details`: opcional, contexto extra (qué id, qué colección, etc.).
+  No todos los errores lo traen.
+
+### De dónde sale cada pieza
+
+- **`src/errors/error-catalog.js`**: diccionario de errores. Cada
+  código define su `statusCode` y mensaje por defecto, en un solo
+  lugar (igual que `src/constants` para roles/estados).
+- **`src/errors/AppError.js`**: clase base de error de dominio. Lee
+  el catálogo para resolver `statusCode`/mensaje a partir de un
+  código.
+- **`src/errors/domain-errors.js`**: errores personalizados concretos
+  (`UserNotFoundError`, `EmailAlreadyInUseError`, `InvalidRoleError`,
+  `ProductNotFoundError`, `InvalidPriceError`, `OrderNotFoundError`,
+  `InvalidMockCollectionError`, `InvalidMockQtyError`,
+  `MockSeedError`). Los services lanzan estas clases directamente.
+- **`src/middlewares/error-handler.middleware.js`**: el único punto
+  que arma la respuesta HTTP. También traduce a este mismo formato
+  los errores que no son de dominio: `ValidationError` de Mongoose
+  (400, con el detalle de qué campo falló), `CastError` de un
+  ObjectId mal formado (400), y cualquier error no controlado (500,
+  sin exponer el detalle interno, pero logueado en consola).
+- **`src/middlewares/not-found.middleware.js`**: cualquier ruta que
+  no exista responde con el mismo formato (`404`, `NOT_FOUND_ROUTE`).
+
+### Validaciones del módulo de mocks
+
+`mock.service.js` valida antes de tocar la base:
+
+| Caso                                   | Código                     | Status |
+|-----------------------------------------|----------------------------|--------|
+| Colección no reconocida                | `INVALID_MOCK_COLLECTION`  | 400    |
+| `qty` no numérico                      | `INVALID_MOCK_QTY`         | 400    |
+| `qty` negativo o cero                  | `INVALID_MOCK_QTY`         | 400    |
+| `qty` mayor al máximo permitido (100)  | `INVALID_MOCK_QTY`         | 400    |
+| Falla al insertar en MongoDB           | `MOCK_SEED_FAILED`         | 502    |
+
+La última fila es clave: si Mongo se cae o el insert falla a mitad de
+camino, `mock.service.js` atrapa ese error técnico y lo traduce a un
+`MockSeedError` con la causa original en `details.causa`, en vez de
+dejar que el error crudo de Mongoose llegue al cliente.
+
+### Cómo probar los casos inválidos
+
+```bash
+# Colección inexistente
+curl "http://localhost:3000/api/mocks/facturas?qty=1"
+
+# qty no numérico
+curl "http://localhost:3000/api/mocks/usuarios?qty=abc"
+
+# qty negativo
+curl "http://localhost:3000/api/mocks/usuarios?qty=-5"
+
+# qty por encima del máximo
+curl "http://localhost:3000/api/mocks/usuarios?qty=999"
+
+# Usuario inexistente
+curl "http://localhost:3000/api/users/64f1c2b3e4b0a1a2b3c4d5e6"
+
+# Id con formato inválido
+curl "http://localhost:3000/api/users/no-es-un-id"
+
+# Precio negativo
+curl -X POST "http://localhost:3000/api/products" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test","price":-10,"stock":5}'
+
+# Ruta que no existe
+curl "http://localhost:3000/api/no-existe"
+```
+
+Todas devuelven la misma estructura `{ "error": { "code", "message", ... } }`,
+solo cambia el `code` y el `statusCode` según el caso.
+
 ## Por qué se separó la lógica entre Service y Repository
 
 El **Repository** es el único módulo que conoce Mongoose: se encarga
@@ -233,6 +341,11 @@ Mongoose ni de reglas de negocio.
 - Los **Repositories** no son "pasamanos": aplican proyecciones
   (`select('-__v')`) y filtros por defecto en vez de un simple
   `Model.find()`.
+- Los **errores de dominio** (`src/errors/`) separan "detectar el
+  problema" (responsabilidad del Service) de "decidir la respuesta
+  HTTP" (responsabilidad exclusiva del middleware). Un Service nunca
+  arma un `res.status(...).json(...)`; solo hace `throw new
+  AlgunErrorDeDominio(...)`.
 - **`src/utils/mock-data.factory.js`** solo construye objetos falsos
   con `faker` y las constantes del dominio; no sabe nada de Mongoose
   ni decide relaciones. Esa decisión (a qué usuario real le

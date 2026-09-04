@@ -1,5 +1,6 @@
 const productRepository = require('../repositories/product.repository');
 const { PRODUCT_STATUS } = require('../constants');
+const { ProductNotFoundError, InvalidPriceError } = require('../errors');
 
 /**
  * Service de Products: acá vive la lógica de negocio.
@@ -20,28 +21,26 @@ class ProductService {
   async getProduct(id) {
     const product = await productRepository.getById(id);
     if (!product) {
-      const error = new Error('Producto no encontrado');
-      error.statusCode = 404;
-      throw error;
+      throw new ProductNotFoundError({ id });
     }
     return product;
   }
 
   async createProduct(data) {
     if (data.price < 0) {
-      const error = new Error('El precio no puede ser negativo');
-      error.statusCode = 400;
-      throw error;
+      throw new InvalidPriceError({ price: data.price });
     }
     return productRepository.create(data);
   }
 
   async updateProduct(id, updates) {
+    if (updates.price !== undefined && updates.price < 0) {
+      throw new InvalidPriceError({ price: updates.price });
+    }
+
     const product = await productRepository.update(id, updates);
     if (!product) {
-      const error = new Error('Producto no encontrado');
-      error.statusCode = 404;
-      throw error;
+      throw new ProductNotFoundError({ id });
     }
     return product;
   }
@@ -49,9 +48,7 @@ class ProductService {
   async deleteProduct(id) {
     const deleted = await productRepository.delete(id);
     if (!deleted) {
-      const error = new Error('Producto no encontrado');
-      error.statusCode = 404;
-      throw error;
+      throw new ProductNotFoundError({ id });
     }
     return deleted;
   }
