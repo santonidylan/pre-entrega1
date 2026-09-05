@@ -370,3 +370,16 @@ La API de ShipNow está documentada utilizando Swagger/OpenAPI.
 - **Ejecución:** Los tests se corren utilizando el script `npm run test`.
 - **Entorno aislado:** Se utiliza un entorno configurado vía variables (`.env.test`) y una base de datos exclusiva para pruebas (`shipnow_test`). Los tests incluyen estrategias de limpieza (drop de colecciones) para no depender de datos previos y no afectar el entorno de desarrollo.
 - **Módulos cubiertos:** Users, Orders, Mocks, Logger y la disponibilidad de Swagger.
+## Despliegue, Producción y Docker (Módulo 8)
+
+### Variables de Entorno Necesarias
+La aplicación valida variables críticas al iniciar y no arrancará si faltan. Utiliza como base el archivo `.env.example`:
+- `PORT`: Puerto en el que corre la API (ej. 3000).
+- `MONGO_URI`: URI de conexión a la base de datos MongoDB.
+- `NODE_ENV`: Entorno de ejecución (`development`, `test`, `production`).
+- `LOG_LEVEL`: Nivel de severidad para los logs.
+
+### Ejecución Local
+1. Instalar dependencias del proyecto:
+   ```bash
+   npm install

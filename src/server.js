@@ -1,10 +1,15 @@
-const logger = require('./config/logger.js');
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const mongoose = require('mongoose');
+const logger = require('./config/logger.js');
 const env = require('./config/env.config');
 const app = require('./app');
 
-// Nos aseguramos de que PORT tenga un valor por defecto si no viene del .env
+// 1. Validación de variables críticas antes de iniciar cualquier cosa
 const PORT = env.port || 3000;
+if (!env.mongoUri) {
+  console.error('[Error Crítico] Falta la variable de entorno obligatoria para la base de datos.');
+  process.exit(1);
+}
 
 async function start() {
   try {

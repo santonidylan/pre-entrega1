@@ -11,6 +11,17 @@ app.use(express.json());
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
+// Endpoint de Health Check (Módulo 8)
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    environment: process.env.NODE_ENV || 'development',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    service: 'ShipNow API'
+  });
+});
+
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
