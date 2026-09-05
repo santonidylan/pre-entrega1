@@ -1,5 +1,4 @@
-# ShipNow API — Módulos 1, 2 y 3: Estructura profesional + Mocking + Manejo de errores
-
+# ShipNow API - Proyecto Final / Módulos Completados
 API de ShipNow refactorizada desde un modelo monolítico hacia una
 arquitectura por capas (**Controller → Service → Repository**), con
 configuración de entorno validada al arranque (Módulo 1) y un módulo de
