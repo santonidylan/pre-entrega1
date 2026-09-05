@@ -354,3 +354,19 @@ Mongoose ni de reglas de negocio.
   "asegura" datos faltantes (si pedís entregas sin tener repartidores
   o pedidos, los crea primero). El `mock.repository.js` solo sabe
   insertar y buscar; no decide nada de negocio.
+## Sistema de Logging y Monitoreo
+- **Herramienta utilizada:** Winston y winston-daily-rotate-file.
+- **Niveles configurados:** debug, http, info, warning, error, fatal.
+- **Comportamiento por entorno:** En entorno de desarrollo (development) la consola muestra a partir del nivel `debug`. En producción (production) muestra a partir de `info`.
+- **Ruta de prueba:** Realizar una petición `GET` a `/api/loggerTest` para disparar y visualizar todos los niveles de log.
+- **Persistencia y rotación:** Los errores críticos (`error` y `fatal`) se guardan automáticamente en la carpeta `/logs` con rotación diaria y se conservan por 14 días. Esta carpeta está excluida del repositorio mediante `.gitignore`.
+## Documentación de la API (Swagger)
+La API de ShipNow está documentada utilizando Swagger/OpenAPI.
+- **Ruta de acceso:** Una vez levantado el servidor, la interfaz interactiva está disponible en `http://localhost:3000/api/docs`.
+- **Módulos documentados:** Users, Orders, Deliveries, Mocks y Logger.
+- **Cómo probar los endpoints:** Puedes expandir cualquier endpoint en la interfaz gráfica, hacer clic en "Try it out", completar los parámetros o el body requeridos y ejecutar la petición directamente desde el navegador.
+## Testing Funcional
+- **Herramientas:** Se configuró una suite automatizada utilizando Mocha (organización), Chai (validación) y Supertest (peticiones HTTP).
+- **Ejecución:** Los tests se corren utilizando el script `npm run test`.
+- **Entorno aislado:** Se utiliza un entorno configurado vía variables (`.env.test`) y una base de datos exclusiva para pruebas (`shipnow_test`). Los tests incluyen estrategias de limpieza (drop de colecciones) para no depender de datos previos y no afectar el entorno de desarrollo.
+- **Módulos cubiertos:** Users, Orders, Mocks, Logger y la disponibilidad de Swagger.

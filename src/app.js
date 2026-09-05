@@ -1,3 +1,5 @@
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocs = require('./config/swagger.config.js');
 const express = require('express');
 const routes = require('./routes');
 const notFoundMiddleware = require('./middlewares/not-found.middleware');
@@ -6,6 +8,8 @@ const errorHandlerMiddleware = require('./middlewares/error-handler.middleware')
 const app = express();
 
 app.use(express.json());
+
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
